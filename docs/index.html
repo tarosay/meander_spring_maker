@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>蛇行ばね 2D設計・変形プレビュー | Meander Spring Maker</title>
+<style>
+:root { color-scheme: light; font-family: system-ui, -apple-system, "Yu Gothic", "Meiryo", sans-serif; color: #202b37; }
+* { box-sizing: border-box; }
+body { background: #f7f7f7; margin: 18px 20px 32px; }
+h1 { font-size: 21px; margin: 0 0 5px; font-weight: 750; }
+.subtitle { color: #556574; font-size: 13px; margin: 0 0 16px; }
+.wrap { display: flex; align-items: flex-start; gap: 20px; max-width: 1320px; }
+.workspace { flex: 1 1 0; min-width: 0; position: sticky; top: 12px; }
+.canvas-shell { background: #fff; border: 1px solid #a6b3c1; overflow: hidden; }
+canvas { display:block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+.legend { margin-top: 10px; font-size: 12px; line-height: 1.8; color: #53606d; }
+.key { display: inline-block; width: 22px; height: 3px; vertical-align: middle; margin: 0 5px 0 14px; border-radius: 2px; }
+.key:first-child { margin-left: 0; }
+.panel { width: 400px; flex: 0 0 400px; background: #fff; border: 1px solid #c5ccd3; padding: 13px; }
+.panel h2 { font-size: 15px; margin: 18px 0 9px; padding: 7px 8px; background: #dfefff; border-left: 6px solid #2f6fb0; }
+.panel h2:first-of-type { margin-top: 10px; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+button { cursor: pointer; min-height: 37px; font: inherit; font-size: 13px; border: 1px solid #9ea9b3; background: #f5f7fa; color: #263543; border-radius: 4px; padding: 7px 9px; }
+button:hover { background: #eaf1f9; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #2f75c1; outline-offset: 2px; }
+button.primary { background: #2f6fb0; border-color: #2f6fb0; color: white; font-weight: 650; }
+button.primary:hover { background: #245b93; }
+button:disabled { cursor: not-allowed; opacity: .4; }
+.full { grid-column: 1 / -1; }
+.field { margin: 10px 0 15px; }
+.field-title { font-size: 13px; font-weight: 650; display: flex; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.field-title output { font-size: 12px; color: #2e68a5; font-family: ui-monospace, Consolas, monospace; white-space: nowrap; }
+.field-row { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+.field-row span { color: #5b6874; min-width: 62px; font-size: 12px; }
+.field input[type=number] { width: 118px; padding: 6px 7px; font-size: 13px; border: 1px solid #bdc7d1; border-radius: 3px; background: #fff; }
+.field input[type=range] { width: 100%; min-width: 0; accent-color: #2f6fb0; }
+.boxes { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.metric { background: #f3f5f8; border: 1px solid #e4e7eb; padding: 9px; min-width: 0; }
+.metric .label { font-size: 11px; color: #566575; }
+.metric .num { font: 700 17px ui-monospace, Consolas, monospace; margin: 5px 0 1px; white-space: nowrap; }
+.metric .unit { font-size: 11px; font-weight: 400; }
+.status { margin: 11px 0; background: #f3f6f9; border-left: 4px solid #6b849a; padding: 10px 11px; font-size: 13px; line-height: 1.6; }
+.status.warn { background: #fff4e7; border-left-color: #bc711b; }
+.status.over { background: #fff0f0; border-left-color: #cf3d3d; }
+.hints { margin: 14px 0 0; font-size: 12px; line-height: 1.65; color: #52616f; }
+.hints p { margin: 6px 0; }
+.checkrow { font-size: 13px; display: flex; align-items: center; gap: 7px; margin: 10px 0; }
+.checkrow input { accent-color: #2f6fb0; }
+.footer { font-size: 11px; color: #6a7581; margin-top: 10px; }
+.bend-select { width: 100%; padding: 8px 7px; background: #fff; border: 1px solid #bdc7d1; border-radius: 3px; font: inherit; font-size: 13px; }
+.bend-note { color: #526475; font-size: 12px; line-height: 1.55; margin-top: 6px; }
+.preset-note { font-size: 12px; background: #edf5fd; border-left: 3px solid #3879b6; padding: 10px; line-height: 1.6; margin: 8px 0 14px; }
+.quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 12px 0; }
+@media(max-width:480px) { .quick-actions { grid-template-columns: 1fr; } }
+@media(max-width: 1000px) { .wrap { flex-direction: column; } .workspace { position: static; width: 100%; max-width: 740px; } .panel { width: 100%; max-width: 740px; flex: none; } }
+@media(max-width: 520px) { body { margin: 12px; } h1 { font-size: 18px; } .panel { padding: 9px; } }
+</style>
+</head>
+<body>
+<h1>蛇行ばね 2D設計・変形プレビュー</h1>
+<p class="subtitle">パラメータで蛇行ばねの中心線を設計し、引張時の変形を確認できます。寸法はすべて mm。DXF / TXT 出力は<strong>無変形時のばね1本</strong>です。</p>
+<main class="wrap">
+  <section class="workspace" aria-label="設計図プレビュー">
+    <div class="canvas-shell"><canvas id="cv" width="900" height="830">Canvasに対応したブラウザで開いてください。</canvas></div>
+    <div class="legend"><span class="key" style="background:#2f6fb0"></span>ばねの中心線・外形 <span class="key" style="background:#aab5c0"></span>変形前 <span class="key" style="background:#dc6b31"></span>ひずみが大きい部分（概算）</div>
+    <div class="status" id="status" role="status" aria-live="polite">計算しています…</div>
+    <div class="footer">P0（黄色）を固定し、P1（緑色）を上下にドラッグできます。表示するのはばね1本です。小変形の2D梁モデルによる概算で、実物の伸び限界を保証しません。</div>
+  </section>
+  <aside class="panel">
+    <div class="actions">
+      <button class="primary" id="downloadDxf">DXF をダウンロード</button>
+      <button class="primary" id="downloadTxt">point curve (.txt) をダウンロード</button>
+      <button id="downloadJson">設定 JSON 保存</button>
+      <button id="uploadJson">設定 JSON 読込</button>
+      <input id="jsonFile" type="file" accept=".json,application/json" hidden>
+      <button class="full" id="reset">初期値に戻す</button>
+    </div>
+    <div class="field" style="margin-top:14px">
+      <div class="field-title"><label for="txtPolylineMode">DSM向けTXTの読み込み方式（Polyline）</label></div>
+      <select id="txtPolylineMode" class="bend-select">
+        <option value="true" selected>True：折れ線（直線・角を維持）</option>
+        <option value="false">False：スプライン補間</option>
+      </select>
+      <div class="bend-note">初期値は True。False にすると DSM で直線や角も滑らかに補間されることがあります。DXFには影響しません。</div>
+    </div>
+    <h2>形状の設定</h2>
+    <div class="preset-note">汎用の蛇行ばねを<strong>1本だけ</strong>設計します。小型部品から大きめの形状まで、寸法と折り返し回数を自由に設定できます。初期寸法は設計例であり、用途を限定しません。</div>
+    <div class="field">
+      <div class="field-title"><label for="bendMode">折り返し形状</label></div>
+      <select id="bendMode" class="bend-select">
+        <option value="semicircle">180°半円弧（標準）</option>
+        <option value="double90">90°円弧 × 2 ＋ 直線（従来）</option>
+      </select>
+      <div id="bendNote" class="bend-note" aria-live="polite"></div>
+    </div>
+    <div id="geometryControls"></div>
+    <h2>引張・材料設定（概算）</h2>
+    <div id="materialControls"></div>
+    <div class="checkrow"><label><input type="checkbox" id="showShape" checked> 板幅のある外形を表示</label></div>
+    <div class="checkrow"><label><input type="checkbox" id="showOriginal" checked> 変形前を重ねて表示</label></div>
+    <div class="checkrow"><label><input type="checkbox" id="showStress" checked> ひずみ集中を色で表示</label></div>
+    <div class="quick-actions"><button type="button" id="tryPull">引張例（2 mm）</button><button type="button" id="relaxPull">変位を 0 mm に戻す</button></div>
+    <h2>計算結果</h2>
+    <div class="boxes">
+      <div class="metric"><div class="label">取付点間距離（無変形時）</div><div class="num"><span id="mNatural">--</span> <span class="unit">mm</span></div></div>
+      <div class="metric"><div class="label">中心線長</div><div class="num"><span id="mLength">--</span> <span class="unit">mm</span></div></div>
+      <div class="metric"><div class="label">外形幅 × 高さ</div><div class="num" style="font-size:14px"><span id="mSize">--</span></div></div>
+      <div class="metric"><div class="label">引張荷重（ばね1本）</div><div class="num"><span id="mForce">--</span> <span class="unit">N</span></div></div>
+      <div class="metric"><div class="label">ばね定数（線形近似）</div><div class="num"><span id="mStiff">--</span> <span class="unit">N/mm</span></div></div>
+      <div class="metric"><div class="label">最大ひずみ（線形近似）</div><div class="num"><span id="mStrain">--</span> <span class="unit">%</span></div></div>
+      <div class="metric"><div class="label">仮の許容ひずみ到達変位</div><div class="num"><span id="mLimit">--</span> <span class="unit">mm</span></div></div>
+    </div>
+    <div class="hints">
+      <p><strong>初期材料値の例：ELEGOO PLA+（XY方向）</strong>。曲げ弾性率 2,979 MPa を解析用の E として使用。数値を変更すれば、ほかの材料も概算できます。材料の降伏・破断特性は、このモデルでは算出しません。</p>
+      <p>● スライダーは即時反映。数値欄は Enter またはフォーカス外れで確定します。</p>
+      <p>● DXF は R12 形式で、中心線は正確な LINE / ARC、閉じた外形は点列近似で別レイヤに出力します。TXT は DesignSpark Mechanical 用の閉じた点列です。Polyline=True（初期値）は折れ線、False はスプライン補間で読み込みます。</p>
+      <p>● 折り返しは標準で半円弧1個（半径＝ピッチの半分）。従来の90°円弧2個＋直線にも切り替えられます。寸法による外形の重なりには警告を出しますが、確認用のCADダウンロードは可能です。</p>
+      <p>● CAD出力は<strong>無変形時のばね1本の形状</strong>です。DSMで面を張り、必要ならZ方向に厚みを付けてSTL化できます。</p>
+      <p>● 「仮の許容ひずみ到達変位」は指定した仮の許容ひずみから計算した目安です。選択した材料の降伏ひずみを計算していないため、<strong>安全な伸びの限界を意味しません</strong>。</p>
+      <p>● 計算は2D線形梁要素法による試算です。材料の等方・均一性、両端クランプ、小変形を仮定し、層間強度、応力集中、自己接触、塑性・クリープ・繰り返し疲労を扱いません。<strong>表示される「許容変位」は破断限界ではありません。</strong></p>
+      <p>● 許容ひずみ0.5%は<strong>検証前の仮設定</strong>であり、保証値ではありません。材料のクリープ、繰り返し変形、積層方向の影響などは実物試験で確認してください。</p>
+    </div>
+  </aside>
+</main>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const canvas = $('cv');
+const ctx = canvas.getContext('2d');
+const CW = canvas.width, CH = canvas.height;
+const BASE = Object.freeze({
+  turns: 6, span: 6, naturalLength: 40, radius: 1.4, beamWidth: 0.9,
+  leadTop: 4, leadBottom: 4, thickness: 2.4, divisions: 12, bendMode: 'semicircle',
+  young: 2979, allowable: 0.5, extension: 0, txtPolyline: true
+});
+let values = {...BASE};
+const defs = [
+  ['turns','折り返し回数 N','回','geometry',2,16,1],
+  ['naturalLength','取付点間距離 L','mm','geometry',15,150,0.5],
+  ['span','左右の折返し位置間隔 W','mm','geometry',2,30,0.1],
+  ['radius','折り返し曲率半径 R','mm','geometry',0.2,8,0.05],
+  ['beamWidth','ばねの線幅 b（XY方向）','mm','geometry',0.3,4,0.05],
+  ['leadTop','上端直線長 L0','mm','geometry',1,20,0.5],
+  ['leadBottom','下端直線長 L1','mm','geometry',1,20,0.5],
+  ['thickness','厚み t（Z方向）','mm','geometry',0.4,12,0.2],
+  ['divisions','角丸の分割数','点 / 90°','geometry',5,24,1],
+  ['young','曲げ弾性率 E（近似用）','MPa','material',500,10000,1],
+  ['allowable','仮の許容ひずみ（要実測）','%','material',0.1,3,0.05],
+  ['extension','引張変位 Δ','mm','material',0,20,0.1]
+];
+const specs = Object.fromEntries(defs.map(d => [d[0], {min:d[4], max:d[5], step:d[6]}]));
+const BEND_MODES = ['semicircle','double90'];
+function syncTxtPolylineMode() { $('txtPolylineMode').value = String(values.txtPolyline); }
+$('txtPolylineMode').addEventListener('change', ev => {
+  values.txtPolyline = ev.target.value === 'true';
+  syncTxtPolylineMode();
+});
+function pitchFrom(v) { return (v.naturalLength-v.leadTop-v.leadBottom)/v.turns; }
+let model = null, previousSignature = '', maxDrag = 40, view = null, dragging = false;
+function finite(v, fallback) { const n=Number(v); return Number.isFinite(n)?n:fallback; }
+function clamp(v,min,max) { return Math.max(min,Math.min(max,v)); }
+function pretty(v, decimals=2) { return Number.isFinite(v) ? Number(v).toLocaleString('ja-JP', {maximumFractionDigits:decimals}) : '--'; }
+function g(id) { return Number(values[id]); }
+function normalize(id, v) {
+  const sp=specs[id]; v=clamp(finite(v,values[id]),sp.min,sp.max);
+  if (id==='turns'||id==='divisions') return Math.round(v);
+  return Math.round(v*1000000)/1000000;
+}
+function radiusMax() { return Math.max(specs.radius.min, Math.min(specs.radius.max, pitchFrom(values)/2, g('span')*0.35, g('leadTop')*0.85, g('leadBottom')*0.85)); }
+function syncField(id) {
+  const n=$(id+'Num'), r=$(id+'Range'), out=$(id+'Val');
+  if (n) n.value=String(values[id]);
+  if (r) r.value=String(values[id]);
+  if (out) out.textContent=pretty(values[id],id==='divisions'||id==='turns'?0:2);
+}
+function enforceRadius() {
+  if(values.bendMode==='semicircle')return;
+  values.radius=normalize('radius', Math.min(values.radius,radiusMax()));
+  $('radiusRange').max=String(radiusMax());
+  $('radiusNum').max=String(radiusMax());
+  syncField('radius');
+}
+for (const [id,title,unit,group,min,max,step] of defs) {
+  const holder=$(group==='geometry'?'geometryControls':'materialControls');
+  const root=document.createElement('div'); root.className='field';
+  root.id=id+'Field';
+  root.innerHTML=`<div class="field-title"><label for="${id}Num">${title}</label><output id="${id}Val"></output></div>
+    <div class="field-row"><span>数値</span><input id="${id}Num" type="number" min="${min}" max="${max}" step="${step}" value="${values[id]}"><span>${unit}</span></div>
+    <div class="field-row"><span>スライダー</span><input id="${id}Range" type="range" min="${min}" max="${max}" step="${step}" value="${values[id]}"></div>`;
+  holder.appendChild(root);
+  const n=$(id+'Num'),r=$(id+'Range');
+  r.addEventListener('input',()=> { values[id]=normalize(id,r.value); n.value=values[id]; refresh(id); });
+  function commit() { values[id]=normalize(id,n.value===''?values[id]:n.value); syncField(id); refresh(id); }
+  n.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ev.preventDefault();n.blur();} });
+  n.addEventListener('blur',commit);
+  syncField(id);
+}
+function syncBendMode(){
+  $('bendMode').value=values.bendMode;
+  $('radiusField').hidden=values.bendMode==='semicircle';
+  const r=pitchFrom(values)/2;
+  $('bendNote').textContent=values.bendMode==='semicircle'
+    ? `水平線の上下間隔 P = ${pretty(pitchFrom(values),3)} mm。折り返しは1つの半円弧（180°）で、中心線半径 R = P / 2 = ${pretty(r,3)} mm。Rは自動計算します。`
+    : `左右それぞれの折り返しを90°円弧2つと間の直線で構成します。曲率半径 R は下の欄から調整できます。`;
+}
+$('bendMode').addEventListener('change',ev=>{
+  values.bendMode=BEND_MODES.includes(ev.target.value)?ev.target.value:'semicircle';
+  previousSignature='';refresh('bendMode');
+});
+function point(x,y) {return {x,y};}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+// Parametric centerline in millimeters. Each turn is either one exact semicircle
+// or the legacy pair of quarter circles with a straight segment between them.
+// Quarter-circle blends at the two grips remain in both modes.
+function generateCenterline(p) {
+  const pts=[], primitives=[];
+  const segMax=Math.max(0.4,Math.min(1.1,p.beamWidth*1.1));
+  function add(x,y) {const q=point(x,y); if(!pts.length||dist(pts[pts.length-1],q)>1e-7) pts.push(q);}
+  function line(x,y) {
+    const last=pts[pts.length-1];if(!last){add(x,y);return;}
+    const L=Math.hypot(x-last.x,y-last.y);
+    if(L<1e-8)return;
+    primitives.push({type:'line',x1:last.x,y1:last.y,x2:x,y2:y});
+    const n=Math.max(1,Math.ceil(L/segMax));
+    for(let i=1;i<=n;i++)add(last.x+(x-last.x)*i/n,last.y+(y-last.y)*i/n);
+  }
+  function arc(cx,cy,r,a0,a1) {
+    if(!(r>0))throw new Error('円弧半径を正の値に設定してください。');
+    primitives.push({type:'arc',cx,cy,r,a0,a1});
+    const n=Math.max(Math.ceil(p.divisions*Math.abs(a1-a0)/(Math.PI/2)), Math.ceil(Math.abs(a1-a0)*r/segMax));
+    for(let i=1;i<=n;i++){const a=a0+(a1-a0)*i/n;add(cx+r*Math.cos(a),cy+r*Math.sin(a));}
+  }
+  const H=p.span/2, R=p.turnRadius, P=p.pitch, N=p.turns, E=p.entryRadius;
+  add(0,-p.leadTop);
+  line(0,-E);
+  arc(-E,-E,E,0,Math.PI/2); // down -> left (upper grip blend)
+  line(-H,0);
+  for(let j=0;j<N;j++) {
+    const y=j*P;
+    if(p.bendMode==='semicircle') {
+      if(j%2===0)arc(-H,y+P/2,P/2,-Math.PI/2,-3*Math.PI/2); // left turn
+      else arc(H,y+P/2,P/2,-Math.PI/2,Math.PI/2); // right turn
+    } else if(j%2===0) {
+      arc(-H,y+R,R,-Math.PI/2,-Math.PI);
+      line(-H-R,y+P-R);
+      arc(-H,y+P-R,R,Math.PI,Math.PI/2);
+    } else {
+      arc(H,y+R,R,-Math.PI/2,0);
+      line(H+R,y+P-R);
+      arc(H,y+P-R,R,0,Math.PI/2);
+    }
+    line(j===N-1?(j%2===0?-E:E):(j%2===0?H:-H),y+P);
+  }
+  const endY=N*P;
+  if(N%2===1)arc(-E,endY+E,E,-Math.PI/2,0); // right -> down
+  else arc(E,endY+E,E,-Math.PI/2,-Math.PI); // left -> down
+  line(0,endY+p.leadBottom);
+  return {pts,primitives};
+}
+function outline(pts,width) {
+  const left=[],right=[],h=width/2;
+  for(let i=0;i<pts.length;i++) {
+    const a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)];
+    const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
+    const nx=-dy/len,ny=dx/len;
+    left.push(point(pts[i].x+nx*h,pts[i].y+ny*h));
+    right.push(point(pts[i].x-nx*h,pts[i].y-ny*h));
+  }
+  return left.concat(right.reverse());
+}
+function mat3Inv(m) {
+  const a=m[0],b=m[1],c=m[2],d=m[3],e=m[4],f=m[5],h=m[6],i=m[7],j=m[8];
+  const A=e*j-f*i, B=c*i-b*j, C=b*f-c*e;
+  const D=f*h-d*j, E=a*j-c*h, F=c*d-a*f;
+  const G=d*i-e*h, H=b*h-a*i, I=a*e-b*d;
+  const det=a*A+b*D+c*G;
+  if (!Number.isFinite(det) || Math.abs(det)<1e-25*Math.max(1, ...m.map(Math.abs)) ) throw new Error('梁計算が不安定です。寸法を見直してください。');
+  return [A,D,G,B,E,H,C,F,I].map(v=>v/det); // transpose of cofactor matrix
+}
+function matMul(a,b){ const z=new Float64Array(9);for(let r=0;r<3;r++)for(let c=0;c<3;c++)for(let k=0;k<3;k++)z[3*r+c]+=a[3*r+k]*b[3*k+c];return z; }
+function matVec(a,v){return [a[0]*v[0]+a[1]*v[1]+a[2]*v[2],a[3]*v[0]+a[4]*v[1]+a[5]*v[2],a[6]*v[0]+a[7]*v[1]+a[8]*v[2]];}
+function tMulVec(edge,v){return [edge[0]*v[0]+edge[3]*v[1]+edge[6]*v[2],edge[1]*v[0]+edge[4]*v[1]+edge[7]*v[2],edge[2]*v[0]+edge[5]*v[1]+edge[8]*v[2]];}
+function tMulMat(edge,other){const m=new Float64Array(9);for(let r=0;r<3;r++)for(let c=0;c<3;c++)for(let k=0;k<3;k++)m[r*3+c]+=edge[k*3+r]*other[k*3+c];return m;}
+function addTo(dest,from,s=1){for(let i=0;i<9;i++)dest[i]+=s*from[i];}
+// Small displacement, isotropic, linear-elastic 2D Euler-Bernoulli frame elements.
+// Fixed end 0; end n-1 constrained to ux=0, uy=1 mm, rotation=0.
+// A=t*b, Iz=t*b^3/12: in-plane bending about Z, not out-of-plane bending.
+function solveFrame(pts,p) {
+  const n=pts.length, A=p.beamWidth*p.thickness, I=p.thickness*p.beamWidth**3/12, E=p.young;
+  const diag=Array.from({length:n},()=>new Float64Array(9));
+  const off=Array.from({length:n-1},()=>new Float64Array(9));
+  const elements=[];
+  for(let i=0;i<n-1;i++) {
+    const v=point(pts[i+1].x-pts[i].x,pts[i+1].y-pts[i].y), L=Math.hypot(v.x,v.y);
+    if(L<1e-8)throw new Error('極端に短い要素が発生しました。');
+    const c=v.x/L,s=v.y/L; const q=E*A/L, b=12*E*I/L**3, d=6*E*I/L**2, e=4*E*I/L, f=2*E*I/L;
+    const kl=[
+      [q,0,0,-q,0,0],[0,b,d,0,-b,d],[0,d,e,0,-d,f],
+      [-q,0,0,q,0,0],[0,-b,-d,0,b,-d],[0,d,f,0,-d,e]
+    ];
+    const T=[[c,s,0,0,0,0],[-s,c,0,0,0,0],[0,0,1,0,0,0],
+      [0,0,0,c,s,0],[0,0,0,-s,c,0],[0,0,0,0,0,1]];
+    const K=Array.from({length:6},()=>new Float64Array(6));
+    const KT=Array.from({length:6},()=>new Float64Array(6));
+    for(let r=0;r<6;r++)for(let col=0;col<6;col++)for(let k=0;k<6;k++)KT[r][col]+=kl[r][k]*T[k][col];
+    for(let r=0;r<6;r++)for(let col=0;col<6;col++)for(let k=0;k<6;k++)K[r][col]+=T[k][r]*KT[k][col];
+    for(let r=0;r<3;r++)for(let col=0;col<3;col++){
+      diag[i][r*3+col]+=K[r][col]; diag[i+1][r*3+col]+=K[r+3][col+3]; off[i][r*3+col]+=K[r][col+3];
+    }
+    elements.push({L,c,s});
+  }
+  const m=n-2;
+  const C=Array(m),D=Array(m);
+  for(let k=0;k<m;k++) {
+    const j=k+1;
+    const a=new Float64Array(diag[j]);
+    let rhs=[0,0,0];
+    if(j===n-2)for(let r=0;r<3;r++)rhs[r]=-off[j][r*3+1];
+    if(k>0) {
+      addTo(a,tMulMat(off[j-1],C[k-1]),-1);
+      const prev=tMulVec(off[j-1],D[k-1]);
+      rhs=rhs.map((x,l)=>x-prev[l]);
+    }
+    const inv=mat3Inv(Array.from(a));
+    C[k]=(k<m-1) ? matMul(inv,off[j]) : null;
+    D[k]=matVec(inv,rhs);
+  }
+  const u=Array.from({length:n},()=>[0,0,0]);
+  u[n-1]=[0,1,0];
+  for(let k=m-1;k>=0;k--) {
+    const next=(k===m-1)?[0,0,0]:matVec(C[k],u[k+2]);
+    u[k+1]=D[k].map((v,r)=>v-next[r]);
+  }
+  // Reaction at lower grip: K_yy*u_end + coupling from adjacent free node.
+  const last=n-1;let stiffness=diag[last][4];
+  for(let r=0;r<3;r++)stiffness+=off[last-1][r*3+1]*u[last-1][r];
+  const strains=[]; let maxStrain=0,imax=0;
+  for(let i=0;i<n-1;i++) {
+    const {L,c,s}=elements[i], ua=u[i],ub=u[i+1];
+    const ax1=c*ua[0]+s*ua[1], ax2=c*ub[0]+s*ub[1];
+    const v1=-s*ua[0]+c*ua[1],v2=-s*ub[0]+c*ub[1];
+    const axial=(ax2-ax1)/L;
+    const k0=6*(v2-v1)/L**2-(4*ua[2]+2*ub[2])/L;
+    const k1=6*(v1-v2)/L**2+(2*ua[2]+4*ub[2])/L;
+    const eps=Math.abs(axial)+p.beamWidth/2*Math.max(Math.abs(k0),Math.abs(k1));
+    strains.push(eps);
+    if(eps>maxStrain){maxStrain=eps;imax=i;}
+  }
+  return {u,strains,maxStrain,imax,stiffness:Math.abs(stiffness)};
+}
+function currentParams(){
+  const pitch=pitchFrom(values);
+  const turnRadius=values.bendMode==='semicircle' ? pitch/2 : g('radius');
+  // The entry/exit quarter circles are independent of the U-turn's semicircle.
+  const entryRadius=values.bendMode==='semicircle'
+    ? Math.min(pitch/2,g('span')*.35,g('leadTop')*.8,g('leadBottom')*.8)
+    : g('radius');
+  return {...values,pitch,turnRadius,entryRadius};
+}
+function updateCalculation() {
+  const p=currentParams();
+  if(p.pitch<=0)throw new Error('取付点間距離 L を上端・下端直線長の合計より大きくしてください。');
+  if(p.bendMode==='double90' && p.pitch<2*p.radius-1e-5)throw new Error('折り返し半径 R がピッチに対して大きすぎます。L・N・R を見直してください。');
+  if(p.entryRadius<=0)throw new Error('上端または下端の直線長が不足しています。');
+  const signature=JSON.stringify([p.bendMode,p.turns,p.span,p.pitch,p.turnRadius,p.entryRadius,p.beamWidth,p.leadTop,p.leadBottom,p.thickness,p.divisions,p.young]);
+  if(signature!==previousSignature || !model) {
+    const {pts,primitives}=generateCenterline(p),frame=solveFrame(pts,p);
+    let len=0;for(let i=1;i<pts.length;i++)len+=dist(pts[i-1],pts[i]);
+    model={pts,primitives,frame,len}; previousSignature=signature;
+  }
+  const epsAllow=g('allowable')/100;
+  const limit=model.frame.maxStrain>1e-15?epsAllow/model.frame.maxStrain:Infinity;
+  maxDrag=clamp(Math.ceil(Math.max(2,Number.isFinite(limit)?limit*2:5)*10)/10,2,20);
+  $('extensionRange').max=String(maxDrag);
+  $('extensionNum').max=String(maxDrag);
+  if(values.extension>maxDrag){values.extension=maxDrag;syncField('extension');}
+  model.limit=limit; model.params=p;
+  return model;
+}
+function canvasPoint(p){return {x:view.ox+p.x*view.scale,y:view.oy+p.y*view.scale};}
+function modelPoint(cx,cy){return {x:(cx-view.ox)/view.scale,y:(cy-view.oy)/view.scale};}
+function drawPath(points,closed=false) {
+  if(points.length===0)return;
+  ctx.beginPath();const first=canvasPoint(points[0]);ctx.moveTo(first.x,first.y);
+  for(let i=1;i<points.length;i++){const q=canvasPoint(points[i]);ctx.lineTo(q.x,q.y);}
+  if(closed)ctx.closePath();
+}
+function drawGrip(q,label,color) {
+  const p=canvasPoint(q);
+  ctx.beginPath();ctx.arc(p.x,p.y,8,0,Math.PI*2);
+  ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#344456';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.font='15px system-ui, sans-serif';ctx.fillStyle='#253645';
+  ctx.fillText(label,p.x+13,p.y-11);
+}
+function drawGrid(bounds) {
+  ctx.save();ctx.strokeStyle='#eff2f5';ctx.lineWidth=1;
+  const dx=5, nx0=Math.ceil(bounds.minX/dx),nx1=Math.floor(bounds.maxX/dx);
+  const ny0=Math.ceil(bounds.minY/dx),ny1=Math.floor(bounds.maxY/dx);
+  for(let i=nx0;i<=nx1;i++){const x=canvasPoint(point(i*dx,0)).x;ctx.beginPath();ctx.moveTo(x,24);ctx.lineTo(x,CH-24);ctx.stroke();}
+  for(let i=ny0;i<=ny1;i++){const y=canvasPoint(point(0,i*dx)).y;ctx.beginPath();ctx.moveTo(24,y);ctx.lineTo(CW-24,y);ctx.stroke();}
+  ctx.restore();
+}
+function buildView(pts) {
+  const p=currentParams();
+  const minX=Math.min(...pts.map(v=>v.x))-p.beamWidth/2-2;
+  const maxX=Math.max(...pts.map(v=>v.x))+p.beamWidth/2+2;
+  const minY=pts[0].y-p.beamWidth/2-2;
+  const maxY=pts.at(-1).y+maxDrag+p.beamWidth/2+2;
+  const width=Math.max(15,maxX-minX), height=Math.max(20,maxY-minY);
+  const sc=Math.min((CW-170)/width,(CH-130)/height);
+  view={scale:sc,ox:CW/2-sc*(maxX+minX)/2,oy:CH/2-sc*(maxY+minY)/2,
+    bounds:{minX,minY,maxX,maxY}};
+}
+function drawSpring(pts,frame,delta,offset=0,mirror=1,labels=false) {
+  const convert=q=>point(q.x*mirror+offset,q.y);
+  const stationary=pts.map(convert);
+  const moved=pts.map((v,i)=>point((v.x+frame.u[i][0]*delta)*mirror+offset,v.y+frame.u[i][1]*delta));
+  const shape=$('showShape').checked;
+  if(delta>0 && $('showOriginal').checked) {
+    if(shape) {drawPath(outline(stationary,g('beamWidth')),true);ctx.fillStyle='rgba(139,151,162,.10)';ctx.fill();ctx.strokeStyle='#bec7d0';ctx.lineWidth=1.3;ctx.stroke();}
+    drawPath(stationary);ctx.setLineDash([6,6]);ctx.strokeStyle='#99abb9';ctx.lineWidth=1.7;ctx.stroke();ctx.setLineDash([]);
+  }
+  if(shape) {drawPath(outline(moved,g('beamWidth')),true);ctx.fillStyle='rgba(58,123,195,.14)';ctx.fill();ctx.lineWidth=1.8;ctx.strokeStyle='#5e8dbf';ctx.stroke();}
+  drawPath(moved);ctx.strokeStyle='#2062a7';ctx.lineWidth=2.8;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
+  if(delta>0 && $('showStress').checked){
+    const threshold=g('allowable')/100;
+    for(let i=0;i<moved.length-1;i++) {
+      const ratio=frame.strains[i]*delta/threshold;
+      if(ratio<.55)continue;
+      const a=canvasPoint(moved[i]),b=canvasPoint(moved[i+1]);
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+      ctx.lineWidth=Math.max(3,g('beamWidth')*view.scale*.33);
+      ctx.strokeStyle=ratio>=1?'#c53a35':ratio>=.8?'#e37b2f':'#e9ae58';ctx.stroke();
+    }
+  }
+  if(labels){
+    drawGrip(moved[0],'P0 固定','#ffce48');
+    drawGrip(moved[moved.length-1],'P1 引張','#72ca73');
+  } else {
+    for(let end=0;end<2;end++) {
+      const q=canvasPoint(moved[end===0?0:moved.length-1]);
+      ctx.beginPath();ctx.arc(q.x,q.y,5,0,Math.PI*2);ctx.fillStyle=end===0?'#ffce48':'#72ca73';ctx.fill();ctx.strokeStyle='#37526a';ctx.lineWidth=1.1;ctx.stroke();
+    }
+  }
+}
+function draw() {
+  ctx.clearRect(0,0,CW,CH);ctx.fillStyle='#fff';ctx.fillRect(0,0,CW,CH);
+  if(!model)return;
+  const {pts,frame}=model,delta=g('extension');
+  buildView(pts);drawGrid(view.bounds);
+  drawSpring(pts,frame,delta,0,1,true);
+  const bar=10*view.scale;
+  ctx.strokeStyle='#606e7c';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(40,CH-36);ctx.lineTo(40+bar,CH-36);
+  ctx.moveTo(40,CH-42);ctx.lineTo(40,CH-30);
+  ctx.moveTo(40+bar,CH-42);ctx.lineTo(40+bar,CH-30);ctx.stroke();
+  ctx.fillStyle='#5f6b78';ctx.font='13px system-ui, sans-serif';ctx.fillText('10 mm',40,CH-48);
+  ctx.textAlign='right';ctx.fillText('実寸表示は縮尺バー参照',CW-25,CH-29);ctx.textAlign='left';
+}
+function showResults() {
+  if(!model)return;
+  const {pts,frame,limit,len}=model,delta=g('extension');
+  const p=currentParams();
+  $('mNatural').textContent=pretty(p.naturalLength,1);
+  $('mLength').textContent=pretty(len,2);
+  $('mSize').textContent=`${pretty(p.span+2*p.turnRadius+p.beamWidth,1)} × ${pretty(p.leadTop+p.leadBottom+p.turns*p.pitch+p.beamWidth,1)} mm`;
+  $('mStiff').textContent=pretty(frame.stiffness,3);
+  $('mForce').textContent=pretty(frame.stiffness*delta,3);
+  $('mStrain').textContent=pretty(frame.maxStrain*delta*100,3);
+  $('mLimit').textContent=Number.isFinite(limit)?pretty(limit,2):'--';
+  const issues=[];
+  if(p.beamWidth>=2*p.turnRadius)issues.push('折り返し中心線のRが線幅の半分以下です。外形が交差するおそれがあります。');
+  if(p.beamWidth>=2*p.entryRadius)issues.push('両端の接続部の円弧半径が線幅の半分以下です。外形が交差するおそれがあります。');
+  if(p.beamWidth>=p.pitch)issues.push('線幅がピッチ以上です。上下の直線部が重なる可能性があります。');
+  if(p.beamWidth>p.turnRadius*.8||p.beamWidth>p.entryRadius*.8)issues.push('線幅に対して曲率半径が小さく、曲がり部の応力集中を梁モデルでは十分に評価できません。');
+  if(delta>p.pitch*.25)issues.push('変位がピッチの25%を超えています。線形・小変形近似の精度は不明です。');
+  const ratio=limit>0?delta/limit:0;
+  const status=$('status');
+  status.className='status'+(ratio>=1?' over':ratio>=.8||issues.length?' warn':'');
+  const msg=ratio>=1?'仮設定の許容ひずみを超過しています。安全限界ではありません。':ratio>=.8?'仮設定の許容ひずみに近づいています。':'P1をドラッグするか、引張変位 Δ を変えるとばねの変形を確認できます。';
+  status.textContent=msg+(issues.length?' 注意：'+issues.join(' '):'');
+  // Keep downloads available even with a warning, so the user can inspect the geometry in CAD.
+  $('downloadDxf').disabled=false;
+  $('downloadTxt').disabled=false;
+}
+function refresh(changed) {
+  if(changed&&changed!=='extension'&&changed!=='young'&&changed!=='allowable')enforceRadius();
+  syncBendMode();
+  syncTxtPolylineMode();
+  try {updateCalculation();draw();showResults();syncField('extension');}
+  catch(e){model=null;previousSignature='';$('status').className='status over';$('status').textContent='計算できませんでした：'+e.message;$('downloadDxf').disabled=true;$('downloadTxt').disabled=true;draw();console.error(e);}
+}
+// DXF R12 centerline is exported as exact LINE / ARC entities (true circles).
+// The thick outer outline is still a sampled closed polyline, as in earlier versions.
+function appendExactCenterline(rows,primitives){
+  const angle=a=>(((a*180/Math.PI)%360)+360)%360;
+  for(const e of primitives){
+    if(e.type==='line'){
+      rows.push('0','LINE','8','CENTER_LINE','10',e.x1.toFixed(5),'20',(-e.y1).toFixed(5),'30','0',
+        '11',e.x2.toFixed(5),'21',(-e.y2).toFixed(5),'31','0');
+    } else {
+      const start=e.a1>e.a0?-e.a1:-e.a0, end=e.a1>e.a0?-e.a0:-e.a1;
+      rows.push('0','ARC','8','CENTER_LINE','10',e.cx.toFixed(5),'20',(-e.cy).toFixed(5),'30','0',
+        '40',e.r.toFixed(5),'50',angle(start).toFixed(6),'51',angle(end).toFixed(6));
+    }
+  }
+}
+// R12 (AC1009) POLYLINE + VERTEX for broad compatibility, dimensions in mm.
+function appendPolyline(rows,pts,layer,closed) {
+  rows.push('0','POLYLINE','8',layer,'6','CONTINUOUS','62','7','66','1','70',closed?'1':'0');
+  for(const p of pts)rows.push('0','VERTEX','8',layer,'10',p.x.toFixed(4),'20',(-p.y).toFixed(4),'30','0');
+  rows.push('0','SEQEND','8',layer);
+}
+function dxfString() {
+  const p=model.pts,shape=outline(p,g('beamWidth'));
+  const rows=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1009','0','ENDSEC',
+    '0','SECTION','2','TABLES','0','TABLE','2','LTYPE','70','1',
+    '0','LTYPE','2','CONTINUOUS','70','0','3','Solid line','72','65','73','0','40','0','0','ENDTAB',
+    '0','TABLE','2','LAYER','70','2'];
+  for(const layer of ['CENTER_LINE','SPRING_OUTLINE'])rows.push('0','LAYER','2',layer,'70','0','62','7','6','CONTINUOUS');
+  rows.push('0','ENDTAB','0','ENDSEC','0','SECTION','2','ENTITIES');
+  appendExactCenterline(rows,model.primitives);
+  appendPolyline(rows,shape,'SPRING_OUTLINE',true);
+  rows.push('0','ENDSEC','0','EOF');return rows.join('\r\n')+'\r\n';
+}
+function txtString() {
+  const shape=outline(model.pts,g('beamWidth'));
+  // DesignSpark Mechanical: user-selectable straight-segment polyline vs. spline interpolation.
+  // Model y grows downward on screen; flip sign for Cartesian CAD Y.
+  return [`Polyline=${values.txtPolyline ? 'True' : 'False'}`].concat(shape.map(p=>`0 ${p.x.toFixed(4)} ${(-p.y).toFixed(4)}`),
+    `0 ${shape[0].x.toFixed(4)} ${(-shape[0].y).toFixed(4)}`).join('\r\n')+'\r\n';
+}
+function download(name,text,mime='text/plain') {
+  const blob=new Blob([text],{type:mime+';charset=utf-8'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+$('downloadDxf').addEventListener('click',()=>{if(model)download('meander_spring.dxf',dxfString(),'application/dxf');});
+$('downloadTxt').addEventListener('click',()=>{if(model)download('meander_spring_point_curve.txt',txtString());});
+$('downloadJson').addEventListener('click',()=>download('meander_spring_settings.json',JSON.stringify({version:5,material:'ELEGOO PLA+ (XY) initial values; editable',...values},null,2),'application/json'));
+$('uploadJson').addEventListener('click',()=>$('jsonFile').click());
+$('jsonFile').addEventListener('change',async ev=>{
+  const file=ev.target.files[0]; if(!file)return;
+  try {
+    const data=JSON.parse(await file.text());
+    if(data && data.version===1 && typeof data.naturalLength!=='number' && Number.isFinite(data.pitch)){data.naturalLength=data.leadTop+data.leadBottom+data.turns*data.pitch;}
+    if(!data || ![1,2,3,4,5].includes(data.version)
+      || (data.version>=4 && !BEND_MODES.includes(data.bendMode))
+      || (data.version===5 && typeof data.txtPolyline!=='boolean')
+      || defs.some(([k])=>typeof data[k]!=='number' || !Number.isFinite(data[k])))throw new Error('設定形式が一致しません。');
+    for(const [key] of defs)values[key]=normalize(key,data[key]);
+    // v1-v3 always used two 90-degree bends; preserve that geometry when loading old JSON.
+    values.bendMode=data.version>=4?data.bendMode:'double90';
+    values.txtPolyline=data.version===5?data.txtPolyline:true; // Legacy settings default to True.
+    for(const key in values)syncField(key);
+    previousSignature='';refresh('span');
+  } catch(e) {alert('設定ファイルを読み込めません：'+e.message);}
+  ev.target.value='';
+});
+$('reset').addEventListener('click',()=>{values={...BASE};for(const id in values)syncField(id);previousSignature='';refresh('span');});
+for(const id of ['showShape','showOriginal','showStress'])$(id).addEventListener('change',draw);
+$('tryPull').addEventListener('click',()=>{values.extension=Math.min(2,maxDrag);syncField('extension');draw();showResults();});
+$('relaxPull').addEventListener('click',()=>{values.extension=0;syncField('extension');draw();showResults();});
+function eventCanvasCoordinates(ev) {const rc=canvas.getBoundingClientRect();return point((ev.clientX-rc.left)*CW/rc.width,(ev.clientY-rc.top)*CH/rc.height);}
+canvas.addEventListener('pointerdown',ev=>{
+  if(!model||!view)return;
+  const c=eventCanvasCoordinates(ev);const pt=model.pts.at(-1),u=model.frame.u.at(-1);
+  const pos=canvasPoint(point(pt.x+u[0]*g('extension'),pt.y+u[1]*g('extension')));
+  if(dist(c,pos)<26) {dragging=true;canvas.setPointerCapture(ev.pointerId);canvas.style.cursor='grabbing';ev.preventDefault();}
+});
+canvas.addEventListener('pointermove',ev=>{
+  if(!dragging||!model||!view)return;
+  const c=eventCanvasCoordinates(ev), end=model.pts.at(-1);
+  values.extension=Math.round(clamp((modelPoint(c.x,c.y).y-end.y),0,maxDrag)*10)/10;
+  syncField('extension');draw();showResults();
+});
+function stopDrag(){dragging=false;canvas.style.cursor='crosshair';}
+canvas.addEventListener('pointerup',stopDrag);
+canvas.addEventListener('pointercancel',stopDrag);
+refresh('span');
+</script>
+</body>
+</html>
