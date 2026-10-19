@@ -58,6 +58,11 @@ DXFでは中心線の直線を `LINE`、円弧を `ARC` として出力し、線
 
 ## 公開・開発
 
-GitHub Pagesを`main`ブランチの`/(root)`から公開する場合は、`index.html`、`README.md`、`assets/`をリポジトリ直下へ配置してください。ブラウザでローカルの`index.html`を直接開いても使用できます。外部ライブラリやサーバーは不要です。
+GitHub Pagesは`main`ブランチの`/docs`から公開しています。公開されるのは`docs/index.html`です。ブラウザでローカルの`docs/index.html`を直接開いても使用できます。外部ライブラリやサーバーは不要です。
 
-ソースはHTML・CSS・JavaScriptを`index.html`にまとめています。
+ソースはHTML・CSS・JavaScriptを`docs/index.html`にまとめています。
+
+| パス | 内容 |
+|---|---|
+| `docs/index.html` | ツール本体（GitHub Pagesで公開） |
+| `assets/` | README用の画像 |
